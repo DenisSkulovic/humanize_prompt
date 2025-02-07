@@ -1,6 +1,6 @@
 import aioredis
 import json
-from backend.humanization_service.core.config import Config
+from core.config import Config
 
 class CacheService:
     """

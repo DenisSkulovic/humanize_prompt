@@ -1,11 +1,12 @@
 import asyncio
 import json
-from backend.humanization_service.services.humanization_service import HumanizationService
-from backend.humanization_service.services.message_queue_service import MessageQueueService
-from backend.humanization_service.database.DatabaseService import DatabaseService
-from backend.humanization_service.dto.humanize_dto import HumanizationTask
-from backend.humanization_service.services.cache_service import CacheService
-from openai import AsyncOpenAI  # Assuming OpenAI async SDK is used
+from services.humanization_service import HumanizationService
+from message_queue.message_queue_service import MessageQueueService
+from database.database_service import DatabaseService
+from message_queue.tasks.humanization_task import HumanizationTask
+from cache.cache_service import CacheService
+from openai import AsyncOpenAI
+from core.config import Config
 
 class HumanizationWorker:
     """
@@ -24,11 +25,14 @@ class HumanizationWorker:
         Processes a single humanization task.
         """
         model_name = task.model_name
+        parameter_explanation_versions = task.parameter_explanation_versions
         for attempt in range(3):  # Retry up to 3 times
             try:
+                explanation_texts = await self.humanization_service.get_explanation_texts(parameter_explanation_versions)
+
                 # Step 1: Construct system prompt from explanations and parameters
                 system_prompt = await self.humanization_service.build_prompt(
-                    task.original_text, task.parameters, task.explanation_texts
+                    task.original_text, task.parameters, explanation_texts
                 )
 
                 # Step 2: Call OpenAI API
@@ -61,7 +65,7 @@ class HumanizationWorker:
         Continuously listens to the RabbitMQ queue for humanization tasks.
         """
         print("[Worker] Listening for humanization tasks...")
-        async for task_json in self.messaging_service.consume("humanization_task"):
+        async for task_json in await self.messaging_service.consume("humanization_task"):
             task_data = json.loads(task_json)
             task = HumanizationTask(**task_data)
             await self.process_task(task)

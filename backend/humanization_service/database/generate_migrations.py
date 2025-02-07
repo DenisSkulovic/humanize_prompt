@@ -1,13 +1,13 @@
 import os
 from alembic import command
 from alembic.config import Config
-from run_alembic_migrations import run_alembic_migrations
+from database.run_alembic_migrations import run_alembic_migrations
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ALEMBIC_CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "alembic.ini"))
+ALEMBIC_CONFIG_PATH = os.path.abspath(os.path.join(BASE_DIR, "../alembic.ini"))
 
 
-def generate_migration_if_schema_changed():
+async def generate_migration_if_schema_changed():
     """Generate a new migration if there are schema changes."""
     print("[migrations.py] Checking for schema changes...", flush=True)
     alembic_cfg = Config(ALEMBIC_CONFIG_PATH)

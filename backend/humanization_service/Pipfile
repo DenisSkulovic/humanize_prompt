@@ -14,6 +14,9 @@ openai = "*"
 asyncpg = "*"
 python-dotenv = "*"
 pydantic = "*"
+aio-pika = "*"
+watchdog = "*"
+aioredis = "*"
 
 [dev-packages]
 

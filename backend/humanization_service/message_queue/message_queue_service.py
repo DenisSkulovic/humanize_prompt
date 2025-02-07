@@ -1,6 +1,6 @@
 import aio_pika
 import asyncio
-from backend.humanization_service.core.config import Config
+from core.config import Config
 
 class MessageQueueService:
     """
@@ -9,7 +9,7 @@ class MessageQueueService:
     def __init__(self):
         self.host = Config.RABBITMQ_HOST
         self.port = Config.RABBITMQ_PORT
-        self.queue_name = os.getenv("RABBITMQ_QUEUE", "default_queue")
+        self.queue_name = Config.RABBITMQ_QUEUE
         self.connection = None
         self.channel = None
 

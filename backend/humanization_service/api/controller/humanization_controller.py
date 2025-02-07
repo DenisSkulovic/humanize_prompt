@@ -1,8 +1,9 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
-from backend.humanization_service.services.humanization_service import HumanizationService
-from backend.humanization_service.services.message_queue_service import MessageQueueService
-from backend.humanization_service.database.DatabaseService import DatabaseService
-from backend.humanization_service.dto.humanize_dto import HumanizationRequestDTO
+from services.humanization_service import HumanizationService
+from message_queue.message_queue_service import MessageQueueService
+from database.database_service import DatabaseService
+from dto.humanize_dto import HumanizationRequestDTO
+from cache.cache_service import CacheService
 import asyncio
 import json
 
@@ -11,11 +12,12 @@ class HumanizationController:
     Controller for handling humanization requests using WebSocket streaming.
     """
 
-    def __init__(self, db_service: DatabaseService, messaging_service: MessageQueueService):
+    def __init__(self, db_service: DatabaseService, cache_service: CacheService, messaging_service: MessageQueueService):
         self.router = APIRouter(prefix="/humanize", tags=["Humanization"])
         self.db_service = db_service
+        self.cache_service = cache_service
         self.messaging_service = messaging_service
-        self.humanization_service = HumanizationService(db_service)
+        self.humanization_service = HumanizationService(db_service, cache_service, messaging_service)
 
         # Register WebSocket endpoint
         self.router.websocket("/ws")(self.websocket_humanization)
@@ -33,16 +35,15 @@ class HumanizationController:
                 data = await websocket.receive_text()
                 request = HumanizationRequestDTO.parse_raw(data)
 
-                # Publish task to RabbitMQ (or another queue)
-                task_id = await self.messaging_service.publish("humanization_task", request.dict())
+                # Build the task
+                task = HumanizationTask.build(request.id, request.original_text, request.model_name, request.parameters, request.parameter_explanation_versions, request.queue_name)
+
+                # Publish task to RabbitMQ
+                task_id = await self.messaging_service.publish("humanization_task", task.dict())
 
                 # Subscribe to the response queue
                 async for chunk in self.messaging_service.consume(f"humanization_result_{task_id}"):
                     await websocket.send_text(chunk)  # Stream chunks to the client
-
-                # Store the final response in the database
-                final_result = "".join(await self.messaging_service.collect_results(f"humanization_result_{task_id}"))
-                await self.humanization_service.store_humanization(request, final_result) # TODO include other necessary things, this is a shallow draft
 
                 await websocket.close()
                 break

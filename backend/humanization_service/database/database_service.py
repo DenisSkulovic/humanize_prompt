@@ -1,13 +1,13 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-import os
+from core.config import Config
 
 class DatabaseService:
     """
     A generic database service that abstracts database interactions using async SQLAlchemy.
     """
     def __init__(self):
-        db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@localhost:5432/mydb")
+        db_url = Config.DATABASE_URL_ASYNC_PG
         self.engine = create_async_engine(db_url, echo=True, future=True)
         self.session_factory = sessionmaker(
             bind=self.engine,

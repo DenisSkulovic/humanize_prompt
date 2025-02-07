@@ -3,36 +3,37 @@ version: '3.8'
 services:
   api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: ./backend/humanization_service
+      dockerfile: Dockerfile.dev
     env_file:
-      - ./backend/api.env
+      - ./backend/humanization_service/api.env
     command: [ "python3", "/app/entrypoint_dev.py" ]
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
+      - ./backend/humanization_service:/app
     depends_on:
       - rabbitmq
       - feedback-postgres
 
   worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: ./backend/humanization_service
+      dockerfile: Dockerfile.dev
     env_file:
-      - ./backend/worker.env
+      - ./backend/humanization_service/worker.env
     command: [ "python3", "/app/entrypoint_dev.py" ]
     depends_on:
+      - api
       - rabbitmq
       - feedback-postgres
     volumes:
-      - ./backend:/app
+      - ./backend/humanization_service:/app
 
   rabbitmq:
     image: rabbitmq:3-management
     env_file:
-      - ./backend/rabbitmq.env
+      - ./backend/humanization_service/rabbitmq.env
     healthcheck:
       test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
       interval: 5s
@@ -45,7 +46,7 @@ services:
   feedback-postgres:
     image: postgres:latest
     env_file:
-      - ./backend/postgres.env
+      - ./backend/humanization_service/postgres.env
     ports:
       - "5432:5432"
     volumes:

@@ -7,12 +7,14 @@ class HumanizationRequestDTO(BaseModel):
     """
     original_text: str = Field(..., min_length=1, description="Text to be humanized")
     parameters: Dict[str, int] = Field(..., description="Settings for humanization (e.g., casualness, humor)")
-    explanation_version_id: Optional[int] = Field(None, description="Version of the explanation rules to apply (Defaults to latest)")
-
+    parameter_explanation_versions: Optional[Dict[str, str]] = Field(None, description="Explanation versions for each parameter")
+    model_name: str = Field(..., description="Name of the OpenAI model to use")
+    
     @staticmethod
-    def build(original_text: str, parameters: Dict[str, int], explanation_version_id: Optional[int] = None):
+    def build(original_text: str, parameters: Dict[str, int], model_name: str, parameter_explanation_versions: Optional[Dict[str, str]] = None):
         return HumanizationRequestDTO(
             original_text=original_text,
             parameters=parameters,
-            explanation_version_id=explanation_version_id
+            parameter_explanation_versions=parameter_explanation_versions,
+            model_name=model_name
         )

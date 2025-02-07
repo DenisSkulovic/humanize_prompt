@@ -1,17 +1,16 @@
 import asyncio
 import json
-from database_service import DatabaseService
-from services.explanation_service import ExplanationService
-from alembic import command
-from alembic.config import Config
+from database.database_service import DatabaseService
+from database.repository.explanation_version import ExplanationRepository
+from database.run_alembic_migrations import run_alembic_migrations
 import os
 
 db_service = DatabaseService()
-explanation_service = ExplanationService(db_service)
+explanation_repository = ExplanationRepository(db_service)
 
 EXPLANATION_SCALES = [
     {
-        "version_number": 1.0,
+        "version_number": 1,
         "scale_name": "casualness",
         "description": "Controls how formal or relaxed the tone is.",
         "examples": json.dumps({
@@ -21,7 +20,7 @@ EXPLANATION_SCALES = [
         })
     },
     {
-        "version_number": 1.0,
+        "version_number": 1,
         "scale_name": "humor",
         "description": "Adjusts the level of wit and fun in the response.",
         "examples": json.dumps({
@@ -31,7 +30,7 @@ EXPLANATION_SCALES = [
         })
     },
     {
-        "version_number": 1.0,
+        "version_number": 1,
         "scale_name": "conciseness",
         "description": "Controls verbosity (length of responses).",
         "examples": json.dumps({
@@ -41,7 +40,7 @@ EXPLANATION_SCALES = [
         })
     },
     {
-        "version_number": 1.0,
+        "version_number": 1,
         "scale_name": "punctuation_errors",
         "description": "Introduces mistakes in punctuation placement.",
         "examples": json.dumps({
@@ -51,7 +50,7 @@ EXPLANATION_SCALES = [
         })
     },
     {
-        "version_number": 1.0,
+        "version_number": 1,
         "scale_name": "typos",
         "description": "Adds misspellings to simulate human mistakes.",
         "examples": json.dumps({
@@ -61,7 +60,7 @@ EXPLANATION_SCALES = [
         })
     },
     {
-        "version_number": 1.0,
+        "version_number": 1,
         "scale_name": "grammatical_imperfections",
         "description": "Introduces grammar mistakes.",
         "examples": json.dumps({
@@ -71,7 +70,7 @@ EXPLANATION_SCALES = [
         })
     },
     {
-        "version_number": 1.0,
+        "version_number": 1,
         "scale_name": "redundancy",
         "description": "Inserts unnecessary words or repetitive phrases.",
         "examples": json.dumps({
@@ -81,7 +80,7 @@ EXPLANATION_SCALES = [
         })
     },
     {
-        "version_number": 1.0,
+        "version_number": 1,
         "scale_name": "informal_contractions",
         "description": "Introduces slang, informal contractions, and text-like speech.",
         "examples": json.dumps({
@@ -96,9 +95,9 @@ async def insert_explanation_scales():
     """Insert predefined explanation scales into the database."""
     print("[initialize_db] Inserting explanation scales...", flush=True)
     for scale in EXPLANATION_SCALES:
-        existing = await explanation_service.get_explanation(scale["version_number"], scale["scale_name"])
+        existing = await explanation_repository.get_explanation(scale_name=scale["scale_name"], version_number=scale["version_number"])
         if not existing:
-            await explanation_service.create_explanation(
+            await explanation_repository.create_explanation(
                 version_number=scale["version_number"],
                 scale_name=scale["scale_name"],
                 description=scale["description"],

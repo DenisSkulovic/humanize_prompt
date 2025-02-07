@@ -47,7 +47,7 @@ def run_migrations_offline() -> None:
     # Get database URL from environment variables
     if not Config.POSTGRES_USER or not Config.POSTGRES_PASSWORD or not Config.POSTGRES_HOST or not Config.POSTGRES_PORT or not Config.POSTGRES_DB:
         raise ValueError("Missing database configuration in environment variables")
-    database_url = f"postgresql://{Config.POSTGRES_USER}:{Config.POSTGRES_PASSWORD}@{Config.POSTGRES_HOST}:{Config.POSTGRES_PORT}/{Config.POSTGRES_DB}"
+    database_url = Config.DATABASE_URL
     print(f"[alembic env.py run_migrations_offline] database_url: {database_url}", flush=True)
     config.set_main_option("sqlalchemy.url", database_url)
     context.configure(
@@ -67,7 +67,7 @@ def run_migrations_online() -> None:
     # Ensure the URL is set
     if not Config.POSTGRES_USER or not Config.POSTGRES_PASSWORD or not Config.POSTGRES_HOST or not Config.POSTGRES_PORT or not Config.POSTGRES_DB:
         raise ValueError("Missing database configuration in environment variables")
-    database_url = f"postgresql://{Config.POSTGRES_USER}:{Config.POSTGRES_PASSWORD}@{Config.POSTGRES_HOST}:{Config.POSTGRES_PORT}/{Config.POSTGRES_DB}"
+    database_url = Config.DATABASE_URL
     print(f"[alembic env.py run_migrations_online] database_url: {database_url}", flush=True)
     config.set_main_option("sqlalchemy.url", database_url)
     connectable = engine_from_config(
