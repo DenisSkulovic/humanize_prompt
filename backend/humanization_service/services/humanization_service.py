@@ -92,8 +92,15 @@ class HumanizationService:
             await self.cache_service.disconnect()
 
 
-    async def store_humanized_text(self, request_id: int, humanized_text: str):
+    async def store_humanized_text(self, task: HumanizationTask, humanized_text: str, explanation_versions: Dict[str, int]):
         """
         Stores the final humanized text in the database after processing.
         """
-        await self.humanization_repository.update_request(request_id, humanized_text)
+        await self.humanization_repository.update_request(
+            request_id = task.request_id,
+            original_text = task.original_text,
+            parameters = task.parameters,
+            explanation_versions = explanation_versions,
+            model_name = task.model_name,
+            humanized_text = humanized_text
+        )

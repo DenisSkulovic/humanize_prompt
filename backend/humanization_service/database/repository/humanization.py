@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from database.database_service import DatabaseService
 from database.model.humanization import HumanizationRequest
+from typing import Dict
 
 class HumanizationRepository:
     """
@@ -11,7 +12,13 @@ class HumanizationRepository:
     def __init__(self, db_service: DatabaseService):
         self.db_service = db_service
 
-    async def create_request(self, original_text: str, parameters: dict, explanation_version_id: int, model_name: str) -> HumanizationRequest:
+    async def create_request(
+        self, 
+        original_text: str, 
+        parameters: dict, 
+        explanation_versions: Dict[str, int] = None, 
+        model_name: str = None
+    ) -> HumanizationRequest:
         """
         Creates a new humanization request.
         """
@@ -19,7 +26,7 @@ class HumanizationRepository:
             request = HumanizationRequest(
                 original_text=original_text,
                 parameters=parameters,
-                explanation_version_id=explanation_version_id,
+                explanation_versions=explanation_versions,
                 model_name=model_name,
             )
             session.add(request)
@@ -27,19 +34,36 @@ class HumanizationRepository:
             await session.refresh(request)
             return request
 
-    async def update_request(self, request_id: int, humanized_text: str) -> HumanizationRequest | None:
+    async def update_request(
+        self,
+        request_id: int,
+        original_text: str = None,
+        parameters: dict = None,
+        explanation_versions: Dict[str, int] = None,
+        model_name: str = None,
+        humanized_text: str = None
+    ) -> HumanizationRequest | None:
         """
-        Updates an existing request with the processed humanized text.
+        Updates an existing request with the provided details and the processed humanized text.
         """
         async for session in self.db_service.get_session():
             request = await session.get(HumanizationRequest, request_id)
             if request:
-                request.humanized_text = humanized_text
+                if original_text is not None:
+                    request.original_text = original_text
+                if parameters is not None:
+                    request.parameters = parameters
+                if explanation_versions is not None:
+                    request.explanation_versions = explanation_versions
+                if model_name is not None:
+                    request.model_name = model_name
+                if humanized_text is not None:
+                    request.humanized_text = humanized_text
                 request.processed_at = func.now()  # Mark processing completion
                 await session.commit()
                 await session.refresh(request)
             return request
-
+            
     async def get_request(self, request_id: int) -> HumanizationRequest | None:
         """
         Retrieves a humanization request by ID.
@@ -58,13 +82,3 @@ class HumanizationRepository:
                 await session.commit()
                 return True
         return False
-
-    async def get_unprocessed_requests(self) -> list[HumanizationRequest]:
-        """
-        Retrieves all requests that haven't been processed yet.
-        """
-        async for session in self.db_service.get_session():
-            result = await session.execute(
-                select(HumanizationRequest).where(HumanizationRequest.humanized_text == None)
-            )
-            return result.scalars().all()

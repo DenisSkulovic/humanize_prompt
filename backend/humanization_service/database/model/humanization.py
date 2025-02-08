@@ -13,7 +13,7 @@ class HumanizationRequest(Base):
     original_text = Column(String, nullable=False)
     humanized_text = Column(String, nullable=True)  # Initially null until processed
     parameters = Column(JSON, nullable=False)  # Stores user-defined transformation parameters
-    explanation_version_id = Column(Integer, ForeignKey("explanation_versions.id"), nullable=False, index=True)
+    explanation_versions = Column(JSON, nullable=False)  # Stores explanation versions used for each scale
     model_name = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())  # Request creation timestamp
     processed_at = Column(DateTime(timezone=True), nullable=True)  # Set when humanization is complete

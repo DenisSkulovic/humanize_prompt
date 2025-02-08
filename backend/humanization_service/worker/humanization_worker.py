@@ -28,16 +28,20 @@ class HumanizationWorker:
         Processes a single humanization task.
         """
         model_name = task.model_name
+        print("[Worker] model_name", model_name, flush=True)
         for attempt in range(attempts if attempts else 3):
             try:
                 explanation_texts = await self.humanization_service.get_explanation_texts(parameters=task.parameters, parameter_explanation_versions=task.parameter_explanation_versions)
+                print("[Worker] explanation_texts", explanation_texts, flush=True)
 
                 # Step 1: Construct system prompt from explanations and parameters
                 system_prompt = await self.humanization_service.build_prompt(
                     task.original_text, task.parameters, explanation_texts
                 )
+                print("[Worker] system_prompt", system_prompt, flush=True)
 
                 # Step 2: Call OpenAI API
+                # TODO: I was debugging this part and carelessly made it await the response. This is not correct. This way it basically waits for all the chunks, and only then streams them instantly. It instead should stream the chunks as they come in.
                 response = await self.openai_client.chat.completions.create(
                     model=model_name,
                     messages=[{"role": "system", "content": system_prompt}],
@@ -48,25 +52,32 @@ class HumanizationWorker:
                 async for chunk in response:
                     
                     chunk_text = getattr(chunk.choices[0].delta, "content", None)
+                    print("[Worker] chunk_text", chunk_text, flush=True)
                     
                     if chunk_text:  # Only process non-empty chunks
                         collected_chunks.append(chunk_text)
 
                         # Step 3: Stream chunk back to RabbitMQ result queue
                         queue_name = f"humanization_result_{task.request_id}"
-                        print("queue_name", queue_name, flush=True)
+                        print("[Worker] queue_name", queue_name, flush=True)
                         message = HumanizedQueueMessage(isLast=False, text_piece=chunk_text)
+                        print("[Worker] message", message, flush=True)
                         await self.messaging_service.publish(queue_name=queue_name, message=json.dumps(message.to_dict()))
 
                 # Step 4: Concatenate the final response and store in DB
                 final_text = "".join(collected_chunks)
-
-                print("final_text", final_text, flush=True)
+                print("[Worker] final_text", final_text, flush=True)
 
                 final_message = HumanizedQueueMessage(isLast=True, final_text=final_text)
                 await self.messaging_service.publish(queue_name=queue_name, message=json.dumps(final_message.to_dict()))
-
-                await self.humanization_service.store_humanized_text(task.request_id, final_text)
+                
+                explanation_versions = {scale: explanation["version_number"] for scale, explanation in explanation_texts.items()}
+                print("[Worker] explanation_versions", explanation_versions, flush=True)
+                await self.humanization_service.store_humanized_text(
+                    task = task,
+                    humanized_text = final_text,
+                    explanation_versions = explanation_versions
+                )
                 break  # Exit loop if successful
 
             except Exception as e:
