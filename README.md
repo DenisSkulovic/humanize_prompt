@@ -9,7 +9,7 @@ The **Humanization Service** is a scalable and modular API designed to transform
 ![System Architecture](./architecture-Architecture.drawio.png)
 
 ### Humanization Flow
-![Humanization Flow](./architecture-Humanization Flow.drawio.png)
+![Humanization Flow](./architecture-Humanization-Flow.drawio.png)
 
 
 ## Features
