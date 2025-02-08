@@ -3,6 +3,15 @@
 ## Overview
 The **Humanization Service** is a scalable and modular API designed to transform AI-generated text into more natural, human-like language based on configurable parameters. It utilizes **FastAPI** for the API service, **RabbitMQ** for asynchronous processing, and **PostgreSQL** for data storage. The service leverages **Redis** for caching and **OpenAI's API** for text transformation.
 
+## Diagrams
+
+### System Architecture
+![System Architecture](./home/denis/Desktop/supercreator_humanize_text/architecture-Architecture.drawio.png)
+
+### Humanization Flow
+![Humanization Flow](./home/denis/Desktop/supercreator_humanize_text/architecture-Humanization Flow.drawio.png)
+
+
 ## Features
 - **Real-time Text Humanization**: Processes text to appear more natural and human-like.
 - **Configurable Parameters**: Adjusts levels of casualness, humor, conciseness, typos, grammatical imperfections, and more.
