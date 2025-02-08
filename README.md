@@ -6,10 +6,10 @@ The **Humanization Service** is a scalable and modular API designed to transform
 ## Diagrams
 
 ### System Architecture
-![System Architecture](./home/denis/Desktop/supercreator_humanize_text/architecture-Architecture.drawio.png)
+![System Architecture](./architecture-Architecture.drawio.png)
 
 ### Humanization Flow
-![Humanization Flow](./home/denis/Desktop/supercreator_humanize_text/architecture-Humanization Flow.drawio.png)
+![Humanization Flow](./architecture-Humanization Flow.drawio.png)
 
 
 ## Features
