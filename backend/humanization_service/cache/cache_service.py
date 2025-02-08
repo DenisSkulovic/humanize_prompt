@@ -13,12 +13,24 @@ class CacheService:
         self.ttl = Config.REDIS_TTL  # Default TTL of 1 hour
         self.client = None
 
+
     async def connect(self):
         """
         Establishes an asynchronous connection to Redis.
         """
-        self.client = await aioredis.from_url(f"redis://{self.host}:{self.port}/{self.db}", decode_responses=True)
+        url = f"redis://{self.host}:{self.port}/{self.db}"
+        print("Connecting to Redis at", url, flush=True)
+        self.client = await aioredis.from_url(url, decode_responses=True)
+
+    async def disconnect(self):
+        """
+        Closes the Redis connection.
+        """
+        if self.client:
+            await self.client.close()
+            self.client = None  
     
+
     async def set(self, key: str, value: dict, ttl: int = None):
         """
         Stores a key-value pair in Redis with an optional TTL.
@@ -31,6 +43,7 @@ class CacheService:
         except Exception as e:
             print(f"Redis set error: {e}")
     
+
     async def get(self, key: str):
         """
         Retrieves a value from Redis by key.
@@ -44,6 +57,7 @@ class CacheService:
             print(f"Redis get error: {e}")
             return None
     
+
     async def delete(self, key: str):
         """
         Deletes a key from Redis.
@@ -55,6 +69,7 @@ class CacheService:
         except Exception as e:
             print(f"Redis delete error: {e}")
     
+
     async def exists(self, key: str) -> bool:
         """
         Checks if a key exists in Redis.

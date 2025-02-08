@@ -3,10 +3,13 @@ import json
 from services.humanization_service import HumanizationService
 from message_queue.message_queue_service import MessageQueueService
 from database.database_service import DatabaseService
-from message_queue.tasks.humanization_task import HumanizationTask
+from message_queue.messages.humanization_task import HumanizationTask
+from message_queue.messages.humanized_queue_message import HumanizedQueueMessage
 from cache.cache_service import CacheService
 from openai import AsyncOpenAI
 from core.config import Config
+
+attempts = 1
 
 class HumanizationWorker:
     """
@@ -25,10 +28,9 @@ class HumanizationWorker:
         Processes a single humanization task.
         """
         model_name = task.model_name
-        parameter_explanation_versions = task.parameter_explanation_versions
-        for attempt in range(3):  # Retry up to 3 times
+        for attempt in range(attempts if attempts else 3):
             try:
-                explanation_texts = await self.humanization_service.get_explanation_texts(parameter_explanation_versions)
+                explanation_texts = await self.humanization_service.get_explanation_texts(parameters=task.parameters, parameter_explanation_versions=task.parameter_explanation_versions)
 
                 # Step 1: Construct system prompt from explanations and parameters
                 system_prompt = await self.humanization_service.build_prompt(
@@ -36,26 +38,39 @@ class HumanizationWorker:
                 )
 
                 # Step 2: Call OpenAI API
-                async with self.openai_client.chat.completions.create(
+                response = await self.openai_client.chat.completions.create(
                     model=model_name,
                     messages=[{"role": "system", "content": system_prompt}],
                     stream=True
-                ) as response:
-                    collected_chunks = []
+                )
 
-                    async for chunk in response:
-                        chunk_text = chunk.choices[0].delta.get("content", "")
+                collected_chunks = []
+                async for chunk in response:
+                    
+                    chunk_text = getattr(chunk.choices[0].delta, "content", None)
+                    
+                    if chunk_text:  # Only process non-empty chunks
                         collected_chunks.append(chunk_text)
 
                         # Step 3: Stream chunk back to RabbitMQ result queue
-                        await self.messaging_service.publish(task.queue_name, chunk_text)
+                        queue_name = f"humanization_result_{task.request_id}"
+                        print("queue_name", queue_name, flush=True)
+                        message = HumanizedQueueMessage(isLast=False, text_piece=chunk_text)
+                        await self.messaging_service.publish(queue_name=queue_name, message=json.dumps(message.to_dict()))
 
                 # Step 4: Concatenate the final response and store in DB
                 final_text = "".join(collected_chunks)
+
+                print("final_text", final_text, flush=True)
+
+                final_message = HumanizedQueueMessage(isLast=True, final_text=final_text)
+                await self.messaging_service.publish(queue_name=queue_name, message=json.dumps(final_message.to_dict()))
+
                 await self.humanization_service.store_humanized_text(task.request_id, final_text)
                 break  # Exit loop if successful
 
             except Exception as e:
+                print(f"Error processing task {task.request_id}: {e}", flush=True)
                 print(f"Retrying task {task.request_id}, attempt {attempt+1}...", flush=True)
                 await asyncio.sleep(2)
 
@@ -65,7 +80,7 @@ class HumanizationWorker:
         Continuously listens to the RabbitMQ queue for humanization tasks.
         """
         print("[Worker] Listening for humanization tasks...")
-        async for task_json in await self.messaging_service.consume("humanization_task"):
+        async for task_json in self.messaging_service.consume("humanization_task"):
             task_data = json.loads(task_json)
             task = HumanizationTask(**task_data)
             await self.process_task(task)

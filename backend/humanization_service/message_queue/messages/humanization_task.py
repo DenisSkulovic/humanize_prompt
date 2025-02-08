@@ -7,6 +7,7 @@ class HumanizationTask(BaseModel):
     """
     request_id: int
     original_text: str
+    model_name: str
     parameters: Dict[str, int]
     parameter_explanation_versions: Dict[str, str]
     queue_name: str  # Where the result should be sent back

@@ -3,10 +3,10 @@ import asyncio
 from database.repository.humanization import HumanizationRepository
 from cache.cache_service import CacheService
 from message_queue.message_queue_service import MessageQueueService
-from dto.humanize_dto import HumanizationRequestDTO
-from message_queue.tasks.humanization_task import HumanizationTask
+from message_queue.messages.humanization_task import HumanizationTask
 from database.repository.explanation_version import ExplanationRepository
 from typing import Dict
+from dto.explanation_dto import ExplanationDTO
 
 class HumanizationService:
     """
@@ -36,7 +36,7 @@ class HumanizationService:
             prompt_lines.append(f"- {scale.capitalize()}: {value}/10 → {explanation}")
 
         prompt_lines.append(f"\nUser input: \"{original_text}\"")
-        prompt_lines.append("Generate the humanized response.")
+        prompt_lines.append("Generate the humanized version of the original user input. Your response must contain only the humanized text, no other text or formatting. You cannot change the meaning of the text, only change the style and tone according to the passed parameters. Your task is to only make sure it is more resembling something written by a human, according to the specified parameters.")
 
         return "\n".join(prompt_lines)
 
@@ -47,30 +47,49 @@ class HumanizationService:
         """
         explanation_texts = {}
 
-        for scale_name in parameters.keys():
-            version = parameter_explanation_versions.get(scale_name, "LATEST")
-            cache_key = f"explanation_version_{version}_{scale_name}"
+        try:
+            await self.cache_service.connect()
 
-            cached_explanation = await self.cache_service.get(cache_key)
-            if cached_explanation:
-                explanation_texts[scale_name] = json.loads(cached_explanation)
-                continue
+            for scale_name in parameters.keys():
+                version = parameter_explanation_versions.get(scale_name, "LATEST")
+                cache_key = f"explanation_version_{version}_{scale_name}"
 
-            # Fetch from DB if not cached
-            explanation = await self.explanation_repository.get_explanation(scale_name, version_number=version if version != "LATEST" else None)
-            if not explanation:
-                raise ValueError(f"Explanation version {version} not found for scale {scale_name}.")
+                cached_explanation = await self.cache_service.get(cache_key)
+                if cached_explanation:
+                    explanation_texts[scale_name] = json.loads(cached_explanation)
+                    continue
 
-            # Transform into {scale_name: explanation_text}
-            explanation_texts[scale_name] = explanation
+                # Fetch from DB if not cached
+                explanationORMObj = await self.explanation_repository.get_explanation(scale_name, version_number=version if version != "LATEST" else None)
+                if not explanationORMObj:
+                    raise ValueError(f"Explanation version {version} not found for scale {scale_name}.")
 
-            # Cache in Redis (under specific version name, and also under LATEST if no specific varions was provided and LATEST was used)
-            await self.cache_service.set(cache_key, json.dumps(explanation))
-            if version == "LATEST":
-                latest_cache_key = f"explanation_version_LATEST_{scale_name}"
-                await self.cache_service.set(latest_cache_key, json.dumps(explanation))
+                examples = json.loads(explanationORMObj.examples)
+                print("Parsed examples:", examples, flush=True)
 
-        return explanation_texts
+                # Convert ORM object to plain object
+                explanation = {
+                    "version_number": explanationORMObj.version_number,
+                    "scale_name": explanationORMObj.scale_name,
+                    "description": explanationORMObj.description,
+                    "examples": examples,
+                    "created_at": explanationORMObj.created_at.isoformat()
+                }
+                print("explanation", explanation, flush=True)
+
+                # Transform into {scale_name: explanation_text}
+                explanation_texts[scale_name] = explanation
+
+                # Cache in Redis (under specific version name, and also under LATEST if no specific varions was provided and LATEST was used)
+                await self.cache_service.set(cache_key, json.dumps(explanation))
+                if version == "LATEST":
+                    latest_cache_key = f"explanation_version_LATEST_{scale_name}"
+                    await self.cache_service.set(latest_cache_key, json.dumps(explanation))
+
+            return explanation_texts
+
+        finally:
+            await self.cache_service.disconnect()
 
 
     async def store_humanized_text(self, request_id: int, humanized_text: str):

@@ -22,6 +22,9 @@ class ManagementController:
         Creates a new explanation version.
         """
         result = await self.explanation_service.create_explanation(
-            explanation.text, explanation.version_number
+            version_number=explanation.version_number,
+            scale_name=explanation.scale_name,
+            description=explanation.description,
+            examples=explanation.examples
         )
         return {"message": "Explanation version created", "version_id": result.id}

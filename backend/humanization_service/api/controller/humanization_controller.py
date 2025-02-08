@@ -4,8 +4,11 @@ from message_queue.message_queue_service import MessageQueueService
 from database.database_service import DatabaseService
 from dto.humanize_dto import HumanizationRequestDTO
 from cache.cache_service import CacheService
+from message_queue.messages.humanization_task import HumanizationTask
 import asyncio
 import json
+from core.config import Config
+from message_queue.messages.humanized_queue_message import HumanizedQueueMessage
 
 class HumanizationController:
     """
@@ -34,16 +37,36 @@ class HumanizationController:
                 # Receive input text and parameters from the client
                 data = await websocket.receive_text()
                 request = HumanizationRequestDTO.parse_raw(data)
-
+                print(f"Received request: {request}", flush=True)
                 # Build the task
-                task = HumanizationTask.build(request.id, request.original_text, request.model_name, request.parameters, request.parameter_explanation_versions, request.queue_name)
+                task = HumanizationTask.build(
+                    request_id=request.request_id,
+                    original_text=request.original_text,
+                    model_name=request.model_name,
+                    parameters=request.parameters,
+                    parameter_explanation_versions=request.parameter_explanation_versions,
+                    queue_name="humanization_task"
+                )
 
                 # Publish task to RabbitMQ
-                task_id = await self.messaging_service.publish("humanization_task", task.dict())
+                task_id = await self.messaging_service.publish(queue_name="humanization_task", message=json.dumps(task.dict()))
 
                 # Subscribe to the response queue
-                async for chunk in self.messaging_service.consume(f"humanization_result_{task_id}"):
-                    await websocket.send_text(chunk)  # Stream chunks to the client
+                queue_name = f"humanization_result_{request.request_id}"
+                print("queue_name", queue_name, flush=True)
+                isLast = False
+                async for chunk in self.messaging_service.consume(queue_name=queue_name):
+                    print("1")
+                    parsed_chumk = json.loads(chunk)
+                    print("2")
+                    message = HumanizedQueueMessage(isLast=parsed_chumk["isLast"], text_piece=parsed_chumk["text_piece"], final_text=parsed_chumk["final_text"])
+                    print("3")
+                    isLast = message.isLast
+                    print("4")
+                    await websocket.send_text(json.dumps(message.to_dict()))  # Stream chunks to the client
+                    print("5")
+                    if isLast:
+                        break
 
                 await websocket.close()
                 break
