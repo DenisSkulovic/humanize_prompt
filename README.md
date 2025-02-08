@@ -122,22 +122,17 @@ docker-compose up --build
 This will start all required services: API, worker, RabbitMQ, PostgreSQL, and Redis.
 
 #### **4. Verify Running Services**
-- API available at: `http://localhost:8000/docs`
+- API available at: `http://localhost:8000/`
 - RabbitMQ Management UI: `http://localhost:15672` (user: guest, password: guest)
 - PostgreSQL at: `localhost:5432`
 - Redis at: `localhost:6379`
-
-#### **5. Run Database Migrations**
-```bash
-docker-compose exec api python database/run_alembic_migrations.py
-```
 
 ---
 
 ## API Endpoints
 | Method | Endpoint | Description |
 |--------|---------|-------------|
-| **POST** | `/humanize` | Process text humanization |
+| **Websocket** | `/humanize/ws` | Process text humanization |
 | **POST** | `/feedback` | Submit user feedback |
 | **POST** | `/management/explanations` | Manage explanation versions |
 
@@ -219,6 +214,7 @@ This flow is to collect feedback from the user about the humanized text.
 
 ### Explanation flow
 Scale explanations must be stored in the database, as opposed to being directly in-code. This is necessary to keep track of explanation changes and how it affects feedback from the users. If the humanization is delegated to OpenAI, we must control what is on our end - the prompts. The quality of prompt instructions, as well as the chosen model, is what determines the quality of the humanized text. At the moment only the model and explanation versions are being tracked, but the other text also found in the prompt should also be versioned in a similar fashion (TO DO).
+For example, "casualness" is an existing parameter/scale, so if one wanted to use another one, for e.g. "obnoxiousness", one would need to create an explanation for it to be used in the OpenAI prompt. Then it is ready to use in requests alongside existing parameters.
 
 In order to use a score, the managing person should only add an explanation for it, and a new type of score could be used.
 To add an explanation, or another version, the managing person should use the endpoint `POST /management/explanations` to create a new explanation, or another version of an existing score explanation.
