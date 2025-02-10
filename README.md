@@ -99,16 +99,12 @@ backend/
 
 ## Setup and Deployment
 ### **Requirements**
-- Python 3.10+
 - Docker & Docker Compose
-- PostgreSQL
-- RabbitMQ
-- Redis
 
 ### **Running the Service**
 #### **1. Clone the Repository**
 ```bash
-git clone https://github.com/your-username/humanization-service.git
+git clone https://github.com/DenisSkulovic/humanize_prompt.git
 cd humanization-service
 ```
 
