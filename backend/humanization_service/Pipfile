@@ -18,6 +18,7 @@ watchdog = "*"
 aioredis = "*"
 uvicorn = {extras = ["standard"], version = "*"}
 websockets = "*"
+psutil = "*"
 
 [dev-packages]
 

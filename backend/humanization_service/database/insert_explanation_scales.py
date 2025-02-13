@@ -2,7 +2,6 @@ import asyncio
 import json
 from database.database_service import DatabaseService
 from database.repository.explanation_version import ExplanationRepository
-from database.run_alembic_migrations import run_alembic_migrations
 import os
 
 db_service = DatabaseService()
@@ -93,7 +92,7 @@ EXPLANATION_SCALES = [
 
 async def insert_explanation_scales():
     """Insert predefined explanation scales into the database."""
-    print("[initialize_db] Inserting explanation scales...", flush=True)
+    print("[insert_explanation_scales] Inserting explanation scales...", flush=True)
     for scale in EXPLANATION_SCALES:
         existing = await explanation_repository.get_explanation(scale_name=scale["scale_name"], version_number=scale["version_number"])
         if not existing:
@@ -103,15 +102,9 @@ async def insert_explanation_scales():
                 description=scale["description"],
                 examples=json.dumps(scale["examples"])  # Convert dict to JSON string
             )
-            print(f"Inserted scale {scale['scale_name']} (version {scale['version_number']})", flush=True)
+            print(f"[insert_explanation_scales] Inserted scale {scale['scale_name']} (version {scale['version_number']})", flush=True)
         else:
-            print(f"Scale {scale['scale_name']} (version {scale['version_number']}) already exists.", flush=True)
-
-async def initialize_db():
-    print("[initialize_db] Starting database initialization...", flush=True)
-    await run_alembic_migrations()
-    await insert_explanation_scales()
-    print("[initialize_db] Database initialization complete!", flush=True)
+            print(f"[insert_explanation_scales] Scale {scale['scale_name']} (version {scale['version_number']}) already exists.", flush=True)
 
 if __name__ == "__main__":
-    asyncio.run(initialize_db())
+    asyncio.run(insert_explanation_scales())

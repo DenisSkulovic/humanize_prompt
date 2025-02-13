@@ -5,10 +5,10 @@ import asyncio
 from aio_pika import connect_robust
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from database.run_alembic_migrations import run_alembic_migrations
-from database.generate_migrations import generate_migration_if_schema_changed
-from database.initialize_db import initialize_db
 from core.config import Config
+import asyncpg
+from database.wait_for_postgres import wait_for_postgres
+from message_queue.wait_for_rabbitmq import wait_for_rabbitmq
 
 role_to_command = {
     "api": ["python3", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"],
@@ -34,35 +34,6 @@ class ReloadHandler(FileSystemEventHandler):
             print(f"[entrypoint.py ReloadHandler on_modified] File changed: {event.src_path}. Restarting process...", flush=True)
             self.start_process()
 
-async def wait_for_postgres():
-    """Wait for PostgreSQL to be ready before starting the API."""
-    print("[entrypoint.py] Waiting for PostgreSQL...", flush=True)
-    retries = 10
-    while retries > 0:
-        try:
-            conn = await asyncpg.connect(Config.DATABASE_URL)
-            await conn.close()
-            print("[entrypoint.py] PostgreSQL is ready!", flush=True)
-            return
-        except Exception as e:
-            print(f"[entrypoint.py] PostgreSQL not ready: {e}", flush=True)
-            time.sleep(2)
-            retries -= 1
-    raise RuntimeError("PostgreSQL did not become ready in time.")
-
-async def wait_for_rabbitmq():
-    """Waits for RabbitMQ to be available before starting services."""
-    print("[entrypoint.py] Waiting for RabbitMQ...", flush=True)
-    while True:
-        try:
-            connection = await connect_robust(Config.RABBITMQ_URL)
-            await connection.close()
-            print("[entrypoint.py] RabbitMQ is ready.", flush=True)
-            break
-        except Exception as e:
-            print(f"[entrypoint.py] Waiting for RabbitMQ... ({e})", flush=True)
-            await asyncio.sleep(2)
-
 def main():
     """Main entrypoint for API & Worker based on ROLE."""
     print(f"[entrypoint.py] Role: {Config.ROLE}", flush=True)
@@ -79,13 +50,13 @@ def main():
     if Config.ROLE not in role_to_command:
         raise ValueError(f"[entrypoint.py] Unsupported role: {Config.ROLE}")
 
-    if Config.ROLE == "api":
-        asyncio.run(generate_migration_if_schema_changed())
-        asyncio.run(run_alembic_migrations())
-        asyncio.run(initialize_db())
-
-    # Wait for RabbitMQ
-    asyncio.run(wait_for_rabbitmq())
+    # Wait for RabbitMQ and PostgreSQL
+    async def wait_for_services():
+        await asyncio.gather(
+            wait_for_rabbitmq(),
+            wait_for_postgres()
+        )
+    asyncio.run(wait_for_services())
 
     # Start process with auto-reload
     print(f"[entrypoint.py] Starting {Config.ROLE} with auto-reload...", flush=True)

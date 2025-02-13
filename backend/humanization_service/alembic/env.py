@@ -31,6 +31,15 @@ target_metadata = Base.metadata
 # ... etc.
 
 
+def process_revision_directives(context, revision, directives):
+    if getattr(context.config.cmd_opts, 'autogenerate', False):
+        script = directives[0]
+        if script.upgrade_ops.is_empty():
+            directives[:] = []
+            print('No changes in schema detected; no migration file generated.')
+
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -64,21 +73,22 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
 
-    # Ensure the URL is set
     if not Config.POSTGRES_USER or not Config.POSTGRES_PASSWORD or not Config.POSTGRES_HOST or not Config.POSTGRES_PORT or not Config.POSTGRES_DB:
         raise ValueError("Missing database configuration in environment variables")
     database_url = Config.DATABASE_URL
     print(f"[alembic env.py run_migrations_online] database_url: {database_url}", flush=True)
     config.set_main_option("sqlalchemy.url", database_url)
     connectable = engine_from_config(
-        {"sqlalchemy.url": database_url},  # Manually passing the resolved URL
+        {"sqlalchemy.url": database_url},
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            process_revision_directives=process_revision_directives,
         )
 
         with context.begin_transaction():

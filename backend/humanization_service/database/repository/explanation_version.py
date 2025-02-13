@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, text
 from database.database_service import DatabaseService
 from database.model.explanation_version import ExplanationVersion
 
@@ -9,6 +9,14 @@ class ExplanationRepository:
 
     def __init__(self, db_service: DatabaseService):
         self.db_service = db_service
+
+    async def execute_raw_query(self, query: str):
+        """
+        Executes a raw SQL query on the explanation_version table.
+        """
+        async for session in self.db_service.get_session():
+            result = await session.execute(text(query))
+            return result.fetchall()
 
     async def create_explanation(self, version_number: int, scale_name: str, description: str, examples: str):
         """

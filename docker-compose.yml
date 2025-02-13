@@ -1,6 +1,29 @@
 version: '3.8'
 
 services:
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      - api
+
+  db-management-helper:
+    build:
+      context: ./backend/humanization_service
+      dockerfile: Dockerfile.dev
+    env_file:
+      - ./backend/humanization_service/api.env
+    command: [ "python3", "/app/manage_db.py" ]
+    volumes:
+      - ./backend/humanization_service/alembic/versions:/app/alembic/versions
+    depends_on:
+      feedback-postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build:
       context: ./backend/humanization_service
@@ -8,13 +31,15 @@ services:
     env_file:
       - ./backend/humanization_service/api.env
     command: [ "python3", "/app/entrypoint_dev.py" ]
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./backend/humanization_service:/app
+    expose:
+      - "8000"
     depends_on:
-      - rabbitmq
-      - feedback-postgres
+      db-management-helper:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      feedback-postgres:
+        condition: service_healthy
 
   worker:
     build:
@@ -24,40 +49,54 @@ services:
       - ./backend/humanization_service/worker.env
     command: [ "python3", "/app/entrypoint_dev.py" ]
     depends_on:
-      - api
-      - rabbitmq
-      - feedback-postgres
-    volumes:
-      - ./backend/humanization_service:/app
+      db-management-helper:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      feedback-postgres:
+        condition: service_healthy
 
   rabbitmq:
     image: rabbitmq:3-management
     env_file:
       - ./backend/humanization_service/rabbitmq.env
+    ports:
+      - "5680:5672"
+      - "15680:15672"
     healthcheck:
       test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
-      interval: 5s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 5
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+      start_period: 10s
 
   feedback-postgres:
     image: postgres:latest
     env_file:
       - ./backend/humanization_service/postgres.env
     ports:
-      - "5432:5432"
+      - "5440:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-U", "user", "-d", "feedback-db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   redis-cache:
     image: redis:latest
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   postgres-data:

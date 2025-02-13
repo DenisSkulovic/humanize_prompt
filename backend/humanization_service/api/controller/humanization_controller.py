@@ -49,24 +49,24 @@ class HumanizationController:
                 )
 
                 # Publish task to RabbitMQ
-                task_id = await self.messaging_service.publish(queue_name="humanization_task", message=json.dumps(task.dict()))
+                task_id = await self.messaging_service.send_message(queue_name="humanization_task", message=json.dumps(task.dict()))
 
                 # Subscribe to the response queue
                 queue_name = f"humanization_result_{request.request_id}"
-                print("queue_name", queue_name, flush=True)
+                print(f"[HumanizationController] Subscribing to queue: {queue_name}", flush=True)
                 isLast = False
-                async for chunk in self.messaging_service.consume(queue_name=queue_name):
-                    print("1")
+                async for chunk in self.messaging_service.get_next_message(queue_name=queue_name):
                     parsed_chumk = json.loads(chunk)
-                    print("2")
+                    print(f"[HumanizationController] Received chunk: {parsed_chumk}", flush=True)
                     message = HumanizedQueueMessage(isLast=parsed_chumk["isLast"], text_piece=parsed_chumk["text_piece"], final_text=parsed_chumk["final_text"])
-                    print("3")
                     isLast = message.isLast
-                    print("4")
                     await websocket.send_text(json.dumps(message.to_dict()))  # Stream chunks to the client
-                    print("5")
                     if isLast:
                         break
+
+                print(f"[HumanizationController] Deleting queue: {queue_name}", flush=True)
+                await self.messaging_service.delete_queue(queue_name=queue_name)
+                print(f"[HumanizationController] Deleted queue: {queue_name}", flush=True)
 
                 await websocket.close()
                 break
